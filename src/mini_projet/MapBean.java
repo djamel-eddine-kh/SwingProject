@@ -11,46 +11,51 @@ import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.geom.Area;
 import java.awt.geom.RoundRectangle2D;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
 import javax.swing.ImageIcon;
 import javax.swing.event.MouseInputListener;
 import org.jxmapviewer.JXMapViewer;
 import org.jxmapviewer.OSMTileFactoryInfo;
-import org.jxmapviewer.google.GoogleMapsTileFactoryInfo;
 import org.jxmapviewer.input.PanMouseInputListener;
 import org.jxmapviewer.input.ZoomMouseWheelListenerCenter;
 import org.jxmapviewer.viewer.DefaultTileFactory;
 import org.jxmapviewer.viewer.GeoPosition;
-import org.jxmapviewer.viewer.TileFactoryInfo;
 
+public class MapBean extends JXMapViewer implements Serializable, PropertyChangeListener {
 
-public class Map extends JXMapViewer implements Serializable, PropertyChangeListener {
+    private static final long serialVersionUID = 1L;
+    private static final String FILENAME = "map.ser"; // Serialization file name
 
     public static final String PROP_POSITION = "position";
-    private static final long serialVersionUID = 1L;
 
     private GeoPosition currentPosition;
+    
     private final Image image;
 
-    public Map() {
-        currentPosition = new GeoPosition(11.636895, 104.883817);
+   public MapBean() {
+    currentPosition = new GeoPosition(11.636895, 104.883817);
+    try {
         setTileFactory(new DefaultTileFactory(new OSMTileFactoryInfo()));
-        initMap();
-        image = new ImageIcon(getClass().getResource("/mini_projet/pin.png")).getImage();
-        addPropertyChangeListener(this); // Listen to own property changes
+    } catch (Exception e) {
+        e.printStackTrace();
     }
+    initMap();
+    image = new ImageIcon(getClass().getResource("/mini_projet/pin.png")).getImage();
+    addPropertyChangeListener(this); // Listen to own property changes
+    
+    // Load serialized map when the object is created
+    loadSerializedMap();
+}
+
 
     private void initMap() {
         setAddressLocation(currentPosition);
@@ -72,12 +77,6 @@ public class Map extends JXMapViewer implements Serializable, PropertyChangeList
         firePropertyChange(PROP_POSITION, oldPosition, currentPosition);
     }
 
-    @Override
-    public void propertyChange(PropertyChangeEvent evt) {
-        if (evt.getPropertyName().equals(PROP_POSITION)) {
-            repaint(); // Repaint map when the current position changes
-        }
-    }
 
     @Override
     protected void paintComponent(Graphics g) {
@@ -106,5 +105,33 @@ public class Map extends JXMapViewer implements Serializable, PropertyChangeList
 
 
 
-   
+   @Override
+    public void propertyChange(PropertyChangeEvent evt) {
+        if (evt.getPropertyName().equals(PROP_POSITION)) {
+            repaint(); // Repaint map when the current position changes
+            serializeMap(); // Serialize the map after any change in position
+        }
+    }
+private void serializeMap() {
+    try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(FILENAME))) {
+        out.writeInt(getZoom()); // Serialize the zoom state
+        out.writeObject(currentPosition); // Serialize the position
+    } catch (IOException e) {
+        e.printStackTrace();
+    }
+}
+
+private void deserializeMap() {
+    try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(FILENAME))) {
+        setZoom(in.readInt()); // Deserialize the zoom state
+        setCurrentPosition((GeoPosition) in.readObject()); // Deserialize the position
+    } catch (IOException | ClassNotFoundException e) {
+        e.printStackTrace();
+    }
+}
+
+
+    public void loadSerializedMap() {
+        deserializeMap();
+    }
 }
